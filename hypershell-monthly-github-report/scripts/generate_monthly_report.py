@@ -136,6 +136,68 @@ def notify(title, message):
     )
 
 
+def parse_args(argv):
+    publish_gist = False
+    month = None
+    for argument in argv:
+        if argument == "--publish-gist":
+            publish_gist = True
+        elif argument.startswith("--"):
+            raise ValueError(f"Unknown option: {argument}")
+        elif month is None:
+            month = argument
+        else:
+            raise ValueError("Expected at most one report month")
+    return month, publish_gist
+
+
+def publish_gist(output_dir, month_label, report_path):
+    chart_paths = sorted((output_dir / "charts").glob("*.svg"))
+    gist_url = subprocess.run(
+        [
+            "gh",
+            "gist",
+            "create",
+            str(report_path),
+            *[str(path) for path in chart_paths],
+            "--desc",
+            f"HyperShell GitHub Monthly Report — {month_label}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip().splitlines()[-1]
+    gist_id = gist_url.rstrip("/").split("/")[-1]
+    raw_base = gist_url.replace(
+        "https://gist.github.com/",
+        "https://gist.githubusercontent.com/",
+    ) + "/raw"
+
+    report = report_path.read_text()
+    for chart_path in chart_paths:
+        report = report.replace(
+            f"charts/{chart_path.name}",
+            f"{raw_base}/{chart_path.name}",
+        )
+
+    payload = {
+        "description": f"HyperShell GitHub Monthly Report — {month_label}",
+        "files": {"REPORT.md": {"content": report}},
+    }
+    payload_path = output_dir / ".gist-payload.json"
+    payload_path.write_text(json.dumps(payload))
+    try:
+        subprocess.run(
+            ["gh", "api", f"gists/{gist_id}", "-X", "PATCH", "--input", str(payload_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        payload_path.unlink(missing_ok=True)
+    return gist_url
+
+
 def grouped_bar_chart(path, title, subtitle, categories, series, value_label):
     width, height = 1150, 620
     left, right, top, bottom = 90, 50, 120, 130
@@ -216,8 +278,9 @@ def stacked_bar_chart(path, title, subtitle, rows, segments, value_label):
 
 def main():
     now = datetime.now(timezone.utc)
-    if len(sys.argv) > 1:
-        year, month = map(int, sys.argv[1].split("-"))
+    month_argument, should_publish_gist = parse_args(sys.argv[1:])
+    if month_argument:
+        year, month = map(int, month_argument.split("-"))
     else:
         year, month = previous_month(now)
     start, end = month_bounds(year, month)
@@ -448,8 +511,13 @@ def main():
     report.append("- The pull-request list endpoint does not provide review timestamps or reviewer identities.")
     report.append("- Review latency and review depth are not calculated.")
     report.append("- `closed_by` identifies the merge/close actor, not necessarily a reviewer.")
-    report.append("- This report does not publish or send anything externally.")
+    report.append("- By default, this report does not publish or send anything externally.")
     (output_dir / "REPORT.md").write_text("\n".join(report) + "\n")
+    gist_url = None
+    if should_publish_gist:
+        gist_url = publish_gist(output_dir, month_label, output_dir / "REPORT.md")
+        summary["gist_url"] = gist_url
+        (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     notify("HyperShell monthly report", f"Created {output_dir / 'REPORT.md'}")
     print(json.dumps({"output_dir": str(output_dir), **summary}, indent=2))
 

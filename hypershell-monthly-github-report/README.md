@@ -27,6 +27,12 @@ The report month defaults to the previous calendar month. To generate a specific
 ~/.codex/skills/hypershell-monthly-github-report/scripts/run_monthly.sh 2026-09
 ```
 
+To publish the report and charts as a secret GitHub Gist:
+
+```bash
+~/.codex/skills/hypershell-monthly-github-report/scripts/run_monthly.sh 2026-09 --publish-gist
+```
+
 ## Requirements
 
 - Python 3
@@ -35,5 +41,5 @@ The report month defaults to the previous calendar month. To generate a specific
 ## Notes
 
 - The script uses the GitHub REST API via `gh`.
-- The report does not publish or send anything externally.
+- Gist publishing is opt-in; without `--publish-gist`, the report does not publish or send anything externally.
 - The local `launchd` schedule is not included in this package.
