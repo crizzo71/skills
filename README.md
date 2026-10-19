@@ -4,7 +4,7 @@ Personal Codex skills for reusable workflows.
 
 ## Skills
 
-- [`hypershell-monthly-github-report`](hypershell-monthly-github-report/README.md): Generate a monthly GitHub development report for `openshift-online/hypershell`.
+- [`hypershell-monthly-github-report`](hypershell-monthly-github-report/README.md): Generate a monthly GitHub development report for `openshift-online/hypershell`, with optional secret Gist publishing.
 
 ## Install
 
